@@ -12,7 +12,7 @@
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./tui": "./src/tui.tsx"
+    "./tui": "./tui.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

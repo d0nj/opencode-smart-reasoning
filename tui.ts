@@ -1,5 +1,6 @@
 import { Plugin } from "@opencode/plugin/tui";
-import { defaultStatusPath, lastDecisionFor } from "./status.js";
+import { jsx } from "@opentui/solid/jsx-runtime";
+import { defaultStatusPath, lastDecisionFor } from "./src/status.js";
 
 function footerText(path: string, sessionID?: string): string {
   if (!sessionID) return "";
@@ -14,7 +15,7 @@ export default Plugin.define({
     const path = defaultStatusPath();
     context.ui.slot({
       append: "prompt.footer.status",
-      render: (input) => <text>{footerText(path, input.sessionID)}</text>,
+      render: (input) => jsx("text", { children: footerText(path, input.sessionID) }),
     });
   },
 });
