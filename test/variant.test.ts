@@ -59,6 +59,12 @@ function fakeCtx(sessionModel: unknown = {}) {
           ],
         }),
       },
+      rpc: {
+        register: async () => ({
+          events: { emit: async () => {} },
+          dispose: async () => {},
+        }),
+      },
     } as any,
   };
 }

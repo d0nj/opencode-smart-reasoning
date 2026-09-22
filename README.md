@@ -121,12 +121,11 @@ override with `includeAgents`/`excludeAgents`.
 
 ## Footer status
 
-The package ships a second entrypoint (`./tui`, loaded automatically) that
-adds the decided effort to the prompt footer, e.g. `effort high/max`. Every
-applied decision is also appended as JSON to
-`~/.local/share/opencode/smart-reasoning.jsonl` (override with the
-`statusFile` option, `false` disables). Restart the TUI to pick up either
-side after updating.
+The `./tui` entrypoint (auto-loaded) shows the decided effort in the prompt
+footer, e.g. `effort high/max`. The server pushes each applied decision to
+it over plugin RPC (`getDecision`/`decided` in `src/rpc.ts`); the footer
+also pulls the current value on render, so reconnects lose nothing.
+Restart the TUI to pick up either side after updating.
 
 ## Options
 

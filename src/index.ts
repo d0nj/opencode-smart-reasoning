@@ -19,10 +19,7 @@ import {
   decideEffort,
   type EffortLevel,
 } from "./jev.js";
-import {
-  appendDecision,
-  defaultStatusPath,
-} from "./status.js";
+import { SmartReasoning } from "./rpc.js";
 
 export interface JevReasoningOptions {
   model?: string;
@@ -40,7 +37,6 @@ export interface JevReasoningOptions {
   optionTemplates?: Record<string, Record<string, unknown>>;
   respectExplicitVariant?: boolean;
   maxKeywords?: string[];
-  statusFile?: string | false;
 }
 
 const DEFAULT_EXCLUDE = ["title", "summary", "compaction"];
@@ -55,6 +51,28 @@ function debugLog(opts: { debug?: boolean }, msg: string): void {
   if (!opts.debug) return;
   console.error(msg);
   appendFile(LOG_FILE, `${new Date().toISOString()} ${msg}\n`).catch(() => {});
+}
+
+interface DecisionRecord {
+  session: string;
+  agent: string;
+  model: string;
+  effort: EffortLevel;
+  variant?: string;
+  applied: boolean;
+  choice?: string;
+  conf?: number;
+  stakes?: number;
+  keyword?: string;
+}
+
+function toOutput(
+  record: DecisionRecord | undefined,
+): Record<string, unknown> {
+  if (!record) return {};
+  return Object.fromEntries(
+    Object.entries(record).filter(([, value]) => value !== undefined),
+  );
 }
 
 interface StashedDecision {
@@ -94,10 +112,6 @@ export default {
       const maxChars = opts.maxStateChars ?? 4000;
       const respectVariant = opts.respectExplicitVariant !== false;
       const maxKeywords = opts.maxKeywords ?? DEFAULT_MAX_KEYWORDS;
-      const statusPath =
-        opts.statusFile === false
-          ? undefined
-          : opts.statusFile?.trim() || defaultStatusPath();
 
       let catalog = new Map<string, CatalogEntry>();
       const refreshCatalog = async () => {
@@ -118,6 +132,15 @@ export default {
         void refreshCatalog();
       };
       const stashed = new Map<string, StashedDecision>();
+      const records = new Map<string, DecisionRecord>();
+
+      const registration = await ctx.rpc.register(SmartReasoning, {
+        getDecision: async (input) => {
+          const sessionID = (input as { sessionID?: unknown }).sessionID;
+          if (typeof sessionID !== "string") return {};
+          return toOutput(records.get(sessionID));
+        },
+      });
 
       const jevOpts = () => ({
         endpoint: opts.endpoint,
@@ -195,7 +218,7 @@ export default {
         }
       });
 
-      const applyDecision = (
+      const applyDecision = async (
         event: {
           sessionID: string;
           agent: string;
@@ -215,20 +238,26 @@ export default {
           entry,
           opts.optionTemplates,
         );
-        if (statusPath) {
-          appendDecision(statusPath, {
-            t: new Date().toISOString(),
-            session: event.sessionID,
-            agent: event.agent,
-            model: `${event.model.providerID}/${event.model.id}`,
-            effort: stashed.effort,
-            variant: applied.variantId,
-            applied: applied.applied,
-            choice: stashed.choice,
-            conf: stashed.conf,
-            stakes: stashed.stakes,
-            keyword: stashed.keyword,
-          });
+        const record: DecisionRecord = {
+          session: event.sessionID,
+          agent: event.agent,
+          model: `${event.model.providerID}/${event.model.id}`,
+          effort: stashed.effort,
+          variant: applied.variantId,
+          applied: applied.applied,
+          choice: stashed.choice,
+          conf: stashed.conf,
+          stakes: stashed.stakes,
+          keyword: stashed.keyword,
+        };
+        records.set(event.sessionID, record);
+        if (records.size > 500) {
+          const oldest = records.keys().next();
+          if (!oldest.done) records.delete(oldest.value);
+        }
+        try {
+          await registration.events.emit("decided", toOutput(record));
+        } catch {
         }
         debugLog(
           opts,
@@ -249,7 +278,7 @@ export default {
 
           const hit = stashed.get(event.sessionID);
           if (hit) {
-            applyDecision(
+            await applyDecision(
               {
                 sessionID: event.sessionID,
                 agent: event.agent,
@@ -276,7 +305,7 @@ export default {
               keyword: fallbackKeyword,
             };
             remember(event.sessionID, keywordStash);
-            applyDecision(
+            await applyDecision(
               {
                 sessionID: event.sessionID,
                 agent: event.agent,
@@ -297,7 +326,7 @@ export default {
             stakes: decision.highStakes,
           };
           remember(event.sessionID, decisionStash);
-          applyDecision(
+          await applyDecision(
             {
               sessionID: event.sessionID,
               agent: event.agent,
@@ -313,6 +342,10 @@ export default {
           );
         }
       });
+
+      return () => {
+        void registration.dispose();
+      };
     },
   }),
 
