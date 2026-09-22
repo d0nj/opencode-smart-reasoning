@@ -11,7 +11,8 @@
   "type": "module",
   "main": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./tui": "./src/tui.tsx"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -20,7 +21,15 @@
   "dependencies": {
     "@opencode/plugin": "latest"
   },
+  "peerDependencies": {
+    "@opentui/core": ">=0.5.8",
+    "@opentui/solid": ">=0.5.8",
+    "solid-js": ">=1.9.0"
+  },
   "devDependencies": {
+    "@opentui/core": "^0.5.12",
+    "@opentui/solid": "^0.5.12",
+    "solid-js": "^1.9.15",
     "typescript": "^5.6.3"
   }
 }

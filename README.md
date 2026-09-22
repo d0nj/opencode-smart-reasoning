@@ -119,6 +119,15 @@ an `{effort}` placeholder, e.g. `{ "deepseek/*": { "reasoningEffort":
 Auxiliary agents `title`/`summary`/`compaction` are excluded by default;
 override with `includeAgents`/`excludeAgents`.
 
+## Footer status
+
+The package ships a second entrypoint (`./tui`, loaded automatically) that
+adds the decided effort to the prompt footer, e.g. `effort high/max`. Every
+applied decision is also appended as JSON to
+`~/.local/share/opencode/smart-reasoning.jsonl` (override with the
+`statusFile` option, `false` disables). Restart the TUI to pick up either
+side after updating.
+
 ## Options
 
 See `JevReasoningOptions` in `src/index.ts`. Full example in

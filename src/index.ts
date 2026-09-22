@@ -19,6 +19,10 @@ import {
   decideEffort,
   type EffortLevel,
 } from "./jev.js";
+import {
+  appendDecision,
+  defaultStatusPath,
+} from "./status.js";
 
 export interface JevReasoningOptions {
   model?: string;
@@ -36,6 +40,7 @@ export interface JevReasoningOptions {
   optionTemplates?: Record<string, Record<string, unknown>>;
   respectExplicitVariant?: boolean;
   maxKeywords?: string[];
+  statusFile?: string | false;
 }
 
 const DEFAULT_EXCLUDE = ["title", "summary", "compaction"];
@@ -55,6 +60,10 @@ function debugLog(opts: { debug?: boolean }, msg: string): void {
 interface StashedDecision {
   promptHash: string;
   effort: EffortLevel;
+  choice?: string;
+  conf?: number;
+  stakes?: number;
+  keyword?: string;
 }
 
 async function sessionVariant(
@@ -85,6 +94,10 @@ export default {
       const maxChars = opts.maxStateChars ?? 4000;
       const respectVariant = opts.respectExplicitVariant !== false;
       const maxKeywords = opts.maxKeywords ?? DEFAULT_MAX_KEYWORDS;
+      const statusPath =
+        opts.statusFile === false
+          ? undefined
+          : opts.statusFile?.trim() || defaultStatusPath();
 
       let catalog = new Map<string, CatalogEntry>();
       const refreshCatalog = async () => {
@@ -141,7 +154,11 @@ export default {
 
           const maxKeyword = findMaxKeyword(text, maxKeywords);
           if (maxKeyword) {
-            remember(event.sessionID, { promptHash, effort: "xhigh" });
+            remember(event.sessionID, {
+              promptHash,
+              effort: "xhigh",
+              keyword: maxKeyword,
+            });
             debugLog(
               opts,
               `[smart-reasoning] prompt session=${event.sessionID} ` +
@@ -158,6 +175,9 @@ export default {
           remember(event.sessionID, {
             promptHash,
             effort: decision.effort,
+            choice: decision.rawChoice,
+            conf: decision.confidence,
+            stakes: decision.highStakes,
           });
 
           debugLog(
@@ -177,11 +197,12 @@ export default {
 
       const applyDecision = (
         event: {
+          sessionID: string;
           agent: string;
           model: { providerID: string; id: string; variant?: string };
           options: Record<string, unknown>;
         },
-        effort: EffortLevel,
+        stashed: Omit<StashedDecision, "promptHash">,
       ) => {
         const key = catalogKey(event.model.providerID, event.model.id);
         const entry = catalog.get(key);
@@ -190,15 +211,30 @@ export default {
           event.options,
           event.model.providerID,
           event.model.id,
-          effort,
+          stashed.effort,
           entry,
           opts.optionTemplates,
         );
+        if (statusPath) {
+          appendDecision(statusPath, {
+            t: new Date().toISOString(),
+            session: event.sessionID,
+            agent: event.agent,
+            model: `${event.model.providerID}/${event.model.id}`,
+            effort: stashed.effort,
+            variant: applied.variantId,
+            applied: applied.applied,
+            choice: stashed.choice,
+            conf: stashed.conf,
+            stakes: stashed.stakes,
+            keyword: stashed.keyword,
+          });
+        }
         debugLog(
           opts,
           `[smart-reasoning] apply agent=${event.agent} ` +
             `model=${event.model.providerID}/${event.model.id} ` +
-            `effort=${effort}` +
+            `effort=${stashed.effort}` +
             (applied.variantId ? ` variant=${applied.variantId}` : "") +
             (applied.applied ? "" : " (no catalog data, defaults kept)"),
         );
@@ -215,11 +251,12 @@ export default {
           if (hit) {
             applyDecision(
               {
+                sessionID: event.sessionID,
                 agent: event.agent,
                 model: event.model,
                 options: event.options as Record<string, unknown>,
               },
-              hit.effort,
+              hit,
             );
             return;
           }
@@ -231,34 +268,43 @@ export default {
             maxChars,
           );
           if (!state.trim()) return;
-          if (findMaxKeyword(state, maxKeywords)) {
-            remember(event.sessionID, {
+          const fallbackKeyword = findMaxKeyword(state, maxKeywords);
+          if (fallbackKeyword) {
+            const keywordStash = {
               promptHash: hashPrompt(`${event.sessionID}:${state}`),
-              effort: "xhigh",
-            });
+              effort: "xhigh" as EffortLevel,
+              keyword: fallbackKeyword,
+            };
+            remember(event.sessionID, keywordStash);
             applyDecision(
               {
+                sessionID: event.sessionID,
                 agent: event.agent,
                 model: event.model,
                 options: event.options as Record<string, unknown>,
               },
-              "xhigh",
+              keywordStash,
             );
             return;
           }
           const response = await askJev(state, jevOpts());
           const decision = decideEffort(response, decideOpts());
-          remember(event.sessionID, {
+          const decisionStash = {
             promptHash: hashPrompt(`${event.sessionID}:${state}`),
             effort: decision.effort,
-          });
+            choice: decision.rawChoice,
+            conf: decision.confidence,
+            stakes: decision.highStakes,
+          };
+          remember(event.sessionID, decisionStash);
           applyDecision(
             {
+              sessionID: event.sessionID,
               agent: event.agent,
               model: event.model,
               options: event.options as Record<string, unknown>,
             },
-            decision.effort,
+            decisionStash,
           );
         } catch (err) {
           debugLog(
