@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   appendDecision,
   defaultStatusPath,
+  footerLabel,
   lastDecisionFor,
   readDecisions,
 } from "../src/status.ts";
@@ -76,5 +77,34 @@ describe("status", () => {
 
   test("default path lives under the data dir", () => {
     expect(defaultStatusPath()).toMatch(/smart-reasoning\.jsonl$/);
+  });
+
+  test("footerLabel formats the latest decision", () => {
+    const { path, cleanup } = sandbox();
+    try {
+      expect(footerLabel(path, "a")).toBe("");
+      expect(footerLabel(path, undefined)).toBe("");
+      appendDecision(path, {
+        t: "1",
+        session: "a",
+        agent: "build",
+        model: "m",
+        effort: "high",
+        variant: "max",
+        applied: true,
+      });
+      expect(footerLabel(path, "a")).toBe("effort high/max");
+      appendDecision(path, {
+        t: "2",
+        session: "a",
+        agent: "build",
+        model: "m",
+        effort: "low",
+        applied: false,
+      });
+      expect(footerLabel(path, "a")).toBe("effort low");
+    } finally {
+      cleanup();
+    }
   });
 });

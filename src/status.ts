@@ -63,6 +63,16 @@ export function lastDecisionFor(
   return undefined;
 }
 
+export function formatDecision(record: DecisionRecord): string {
+  return `effort ${record.effort}${record.variant ? `/${record.variant}` : ""}`;
+}
+
+export function footerLabel(path: string, sessionID?: string): string {
+  if (!sessionID) return "";
+  const record = lastDecisionFor(path, sessionID);
+  return record ? formatDecision(record) : "";
+}
+
 export function tmpStatusPath(suffix: string): string {
   return join(tmpdir(), `smart-reasoning-${suffix}.jsonl`);
 }

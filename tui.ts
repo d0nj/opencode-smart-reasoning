@@ -1,21 +1,32 @@
 import { Plugin } from "@opencode/plugin/tui";
 import { jsx } from "@opentui/solid/jsx-runtime";
-import { defaultStatusPath, lastDecisionFor } from "./src/status.js";
+import { createSignal, onCleanup } from "solid-js";
+import { defaultStatusPath, footerLabel } from "./src/status.js";
 
-function footerText(path: string, sessionID?: string): string {
-  if (!sessionID) return "";
-  const record = lastDecisionFor(path, sessionID);
-  if (!record) return "";
-  return `effort ${record.effort}${record.variant ? `/${record.variant}` : ""}`;
-}
+const PATH = defaultStatusPath();
 
 export default Plugin.define({
   id: "smart-reasoning-tui",
   setup(context) {
-    const path = defaultStatusPath();
     context.ui.slot({
       append: "prompt.footer.status",
-      render: (input) => jsx("text", { children: footerText(path, input.sessionID) }),
+      render: (input) => {
+        try {
+          const [label, setLabel] = createSignal(
+            footerLabel(PATH, input.sessionID),
+          );
+          const timer = setInterval(() => {
+            const next = footerLabel(PATH, input.sessionID);
+            if (next !== label()) setLabel(next);
+          }, 2000);
+          onCleanup(() => clearInterval(timer));
+          return jsx("text", { children: () => label() });
+        } catch {
+          return jsx("text", {
+            children: footerLabel(PATH, input.sessionID),
+          });
+        }
+      },
     });
   },
 });
