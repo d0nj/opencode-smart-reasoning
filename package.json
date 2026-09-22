@@ -1,0 +1,26 @@
+{
+  "name": "opencode-smart-reasoning",
+  "version": "0.1.0",
+  "description": "Use Jev (via OpenCode Zen SystemOne) to pick per-request reasoning effort for agents",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/d0nj/opencode-smart-reasoning.git"
+  },
+  "files": ["src/", "index.ts", "README.md", "opencode.jsonc.example"],
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@opencode/plugin": "latest"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}

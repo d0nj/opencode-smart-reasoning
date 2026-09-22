@@ -1,0 +1,19 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    {
+      "package": "opencode-smart-reasoning",
+      "options": {
+        "model": "jev-1.13-free",
+        "defaultEffort": "medium",
+        "maxEffort": "xhigh",
+        "minConfidence": 0.35,
+        "stakesThreshold": 0.7,
+        "timeoutMs": 8000,
+        "excludeAgents": ["title", "summary", "compaction"],
+        "maxStateChars": 4000,
+        "debug": false
+      }
+    }
+  ]
+}
