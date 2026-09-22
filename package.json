@@ -1,6 +1,6 @@
 {
   "name": "opencode-smart-reasoning",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Use Jev (via OpenCode Zen SystemOne) to pick per-request reasoning effort for agents",
   "license": "MIT",
   "repository": {
